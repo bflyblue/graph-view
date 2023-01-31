@@ -1,0 +1,67 @@
+{
+  "_generic": {
+    "defaultPackage": "graph-view",
+    "invalidationHash": "efe77de1c0ca61f6d47df26df00a825a9e6e0cc9138fb6673c884261d6d49a89",
+    "location": "",
+    "packages": {
+      "graph-view": "0.1.0"
+    },
+    "sourcesAggregatedHash": null,
+    "subsystem": "nodejs"
+  },
+  "_subsystem": {
+    "meta": {
+      "license": []
+    },
+    "nodejsVersion": "14"
+  },
+  "cyclicDependencies": {},
+  "dependencies": {
+    "graph-view": {
+      "0.1.0": [
+        [ "@tsconfig/node16", "1.0.3" ],
+        [ "@tsconfig/node16-strictest", "1.0.4" ],
+        [ "@types/node", "18.11.18" ],
+        [ "null", "2.0.0" ],
+        [ "typescript", "4.9.5" ]
+      ]
+    }
+  },
+  "sources": {
+    "@tsconfig/node16": {
+      "1.0.3": {
+        "hash": "sha512-yOlFc+7UtL/89t2ZhjPvvB/DeAr3r+Dq58IgzsFkOAvVC6NMJXmCGjbptdXdR9qsX7pKcTL+s87FtYREi2dEEQ==",
+        "type": "http",
+        "url": "https://registry.npmjs.org/@tsconfig/node16/-/node16-1.0.3.tgz"
+      }
+    },
+    "@tsconfig/node16-strictest": {
+      "1.0.4": {
+        "hash": "sha512-kp6/DuAoKzHVv5U+p0uOesYbjrEvrYVNdQMl163a+yXXUv9twabvkCGEn3pmVxKXB45JU5MPGolDDWnONZL5ZQ==",
+        "type": "http",
+        "url": "https://registry.npmjs.org/@tsconfig/node16-strictest/-/node16-strictest-1.0.4.tgz"
+      }
+    },
+    "@types/node": {
+      "18.11.18": {
+        "hash": "sha512-DHQpWGjyQKSHj3ebjFI/wRKcqQcdR+MoFBygntYOZytCqNfkd2ZC4ARDJ2DQqhjH5p85Nnd3jhUJIXrszFX/JA==",
+        "type": "http",
+        "url": "https://registry.npmjs.org/@types/node/-/node-18.11.18.tgz"
+      }
+    },
+    "null": {
+      "2.0.0": {
+        "hash": "sha512-CVSXPeB7Af0Sku7w8N8EKkgcwvQ6wGNfs6bly419A/q6dpIwzaHIk+65+La2g80ml21uxVXQo8xReTMI2WEYbA==",
+        "type": "http",
+        "url": "https://registry.npmjs.org/null/-/null-2.0.0.tgz"
+      }
+    },
+    "typescript": {
+      "4.9.5": {
+        "hash": "sha512-1FXk9E2Hm+QzZQ7z+McJiHL4NW1F2EzMu9Nq9i3zAaGqibafqYwCVU6WyWAuyQRRzOlxou8xZSyXLEN8oKj24g==",
+        "type": "http",
+        "url": "https://registry.npmjs.org/typescript/-/typescript-4.9.5.tgz"
+      }
+    }
+  }
+}
