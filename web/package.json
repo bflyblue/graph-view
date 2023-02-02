@@ -1,13 +1,9 @@
 {
   "name": "graph-view",
   "version": "0.1.0",
-  "main": "dist/index.js",
-  "bin": {
-    "ts-node-nix": "dist/index.js"
-  },
+  "browser": "dist/index.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js"
+    "build": "tsc -p tsconfig.json"
   },
   "dependencies": {},
   "devDependencies": {
