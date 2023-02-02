@@ -8,12 +8,11 @@
       url = "github:edolstra/flake-compat";
       flake = false;
     };
-    graph-view-web = { url = "path:web"; };
-    graph-view-server = { url = "path:server"; };
+    web = { url = "path:web"; };
+    server = { url = "path:server"; };
   };
 
-  outputs =
-    { self, nixpkgs, flake-utils, graph-view-web, graph-view-server, ... }:
+  outputs = { self, nixpkgs, flake-utils, web, server, ... }:
     let
       # pkgs = import nixpkgs { system = "x86_64-linux"; };
       supportedSystems = [ "x86_64-linux" ];
@@ -21,15 +20,17 @@
       nixpkgsFor = forallSystems (system: import nixpkgs { inherit system; });
     in {
       packages = forallSystems (system:
-        let pkgs = nixpkgsFor.${system};
-        in {
-          graph-view-server = graph-view-server.packages.${system}.default;
-          graph-view-web = graph-view-web.packages.${system}.default;
-          graph-view = pkgs.writeShellScriptBin "graph-view" ''
-            ${self.packages.${system}.graph-view-server}/graph-view-server ${
-              self.packages.${system}.graph-view-web
-            }/lib/node_modules/graph-view/dist
+        let
+          pkgs = nixpkgsFor.${system};
+          graph-view-server = server.packages.${system}.default;
+          graph-view-web = pkgs.runCommandLocal "graph-view-web" { } ''
+            mkdir -p "$out"
+            cp -r ${web.packages.x86_64-linux.default}/lib/node_modules/graph-view/dist/* "$out"
           '';
+        in {
+          inherit graph-view-server graph-view-web;
+          graph-view = pkgs.writeShellScriptBin "graph-view"
+            "${graph-view-server}/graph-view-server ${graph-view-web} ";
           default = self.packages.${system}.graph-view;
         });
       devShells = forallSystems (system:
@@ -37,8 +38,8 @@
         in {
           default = pkgs.mkShell {
             inputsFrom = [
-              graph-view-server.devShells.${system}.default
-              graph-view-web.devShells.${system}.default
+              server.devShells.${system}.default
+              web.devShells.${system}.default
             ];
           };
         });
