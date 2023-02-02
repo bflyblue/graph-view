@@ -3,14 +3,17 @@
   "version": "0.1.0",
   "browser": "dist/index.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "rollup --config"
   },
   "dependencies": {},
   "devDependencies": {
+    "@rollup/plugin-typescript": "^11.0.0",
     "@tsconfig/node16": "^1.0.3",
     "@tsconfig/node16-strictest": "^1.0.4",
     "@types/node": "^18.11.18",
+    "rollup": "^3.12.1",
     "typescript": "^4.9.5",
     "webgl-operate": "^0.8.0"
-  }
+  },
+  "type": "module"
 }

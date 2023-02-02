@@ -28,7 +28,7 @@
           graph-view = pkgs.writeShellScriptBin "graph-view" ''
             ${self.packages.${system}.graph-view-server}/graph-view-server ${
               self.packages.${system}.graph-view-web
-            }
+            }/lib/node_modules/graph-view/dist
           '';
           default = self.packages.${system}.graph-view;
         });

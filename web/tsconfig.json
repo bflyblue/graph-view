@@ -2,6 +2,14 @@
   "extends": "@tsconfig/node16-strictest/tsconfig.json",
   "compilerOptions": {
     "lib": ["DOM", "ES2022"],
-    "outDir": "./dist"
-  }
+    "module": "ESNext",
+    "target": "ES2022",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "node"
+  },
+
+  "include": ["src/*.ts"]
 }
