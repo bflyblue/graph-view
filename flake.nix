@@ -32,6 +32,15 @@
           '';
           default = self.packages.${system}.graph-view;
         });
+      devShells = forallSystems (system:
+        let pkgs = nixpkgsFor.${system};
+        in {
+          default = pkgs.mkShell {
+            inputsFrom = [
+              graph-view-server.devShells.${system}.default
+              graph-view-web.devShells.${system}.default
+            ];
+          };
+        });
     };
-
 }
