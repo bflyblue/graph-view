@@ -32,6 +32,7 @@
     },
     "graph-view": {
       "0.1.0": [
+        [ "@rollup/plugin-html", "1.0.2" ],
         [ "@rollup/plugin-typescript", "11.0.0" ],
         [ "@rollup/pluginutils", "5.0.2" ],
         [ "@tsconfig/node16", "1.0.3" ],
@@ -90,6 +91,13 @@
     }
   },
   "sources": {
+    "@rollup/plugin-html": {
+      "1.0.2": {
+        "hash": "sha512-jGqb45BPj5kwvb/bq1jIzUDLebsm1xmfnY1rwgTIZyjpsMyMKLuQO27n4z5qv6kZmxqxh+CBRD7d1rjAu85Uzg==",
+        "type": "http",
+        "url": "https://registry.npmjs.org/@rollup/plugin-html/-/plugin-html-1.0.2.tgz"
+      }
+    },
     "@rollup/plugin-typescript": {
       "11.0.0": {
         "hash": "sha512-goPyCWBiimk1iJgSTgsehFD5OOFHiAknrRJjqFCudcW8JtWiBlK284Xnn4flqMqg6YAjVG/EE+3aVzrL5qNSzQ==",
