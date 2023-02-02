@@ -8,8 +8,8 @@
       url = "github:edolstra/flake-compat";
       flake = false;
     };
-    graph-view-web = { url = "./web"; };
-    graph-view-server = { url = "./server"; };
+    graph-view-web = { url = "path:web"; };
+    graph-view-server = { url = "path:server"; };
   };
 
   outputs =
