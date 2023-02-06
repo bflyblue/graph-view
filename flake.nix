@@ -30,7 +30,7 @@
         in {
           inherit graph-view-server graph-view-web;
           graph-view = pkgs.writeShellScriptBin "graph-view"
-            "${graph-view-server}/graph-view-server ${graph-view-web} ";
+            "${graph-view-server}/bin/graph-view-server --webroot ${graph-view-web}";
           default = self.packages.${system}.graph-view;
         });
       devShells = forallSystems (system:

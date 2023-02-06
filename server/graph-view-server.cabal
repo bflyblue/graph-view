@@ -66,7 +66,15 @@ executable graph-view-server
   -- other-extensions:
 
   -- Other library packages from which modules are imported.
-  build-depends:    base ^>=4.16.3.0
+  build-depends:
+    , aeson
+    , base                  ^>=4.16.3.0
+    , optparse-applicative
+    , postgresql-simple
+    , resource-pool
+    , servant-server
+    , text
+    , warp
 
   -- Directories containing source files.
   hs-source-dirs:   src
