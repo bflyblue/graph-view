@@ -65,14 +65,16 @@ type Api =
     :<|> "edge" :> Capture "edge_id" Int :> Get '[JSON] Edge
 
 data Node = Node
-  { nodeLabels :: [Text]
+  { nodeId :: Int
+  , nodeLabels :: [Text]
   , nodeProperties :: Value
   , nodeIn :: [Edge]
   , nodeOut :: [Edge]
   }
 
 data Edge = Edge
-  { edgeLabels :: [Text]
+  { edgeId :: Int
+  , edgeLabels :: [Text]
   , edgeProperties :: Value
   , edgeA :: Int
   , edgeB :: Int
@@ -81,7 +83,8 @@ data Edge = Edge
 instance ToJSON Node where
   toJSON node =
     object
-      [ "labels" .= nodeLabels node
+      [ "node_id" .= nodeId node
+      , "labels" .= nodeLabels node
       , "properties" .= nodeProperties node
       , "in" .= nodeIn node
       , "out" .= nodeOut node
@@ -90,7 +93,8 @@ instance ToJSON Node where
 instance ToJSON Edge where
   toJSON edge =
     object
-      [ "labels" .= edgeLabels edge
+      [ "edge_id" .= edgeId edge
+      , "labels" .= edgeLabels edge
       , "properties" .= edgeProperties edge
       , "a" .= edgeA edge
       , "b" .= edgeB edge
@@ -109,24 +113,24 @@ single _ = throwError err500
 
 getNode :: Env -> Int -> Handler Node
 getNode env nodeId = withResource (envDbPool env) $ \conn -> do
-  node <- single =<< liftIO (query conn "select labels, properties from nodes where id=?" (Only nodeId))
-  ins <- liftIO (query conn "select labels, properties, a, b from edges where b=?" (Only nodeId))
-  outs <- liftIO (query conn "select labels, properties, a, b from edges where a=?" (Only nodeId))
+  node <- single =<< liftIO (query conn "select id, labels, properties from nodes where id=?" (Only nodeId))
+  ins <- liftIO (query conn "select id, labels, properties, a, b from edges where b=?" (Only nodeId))
+  outs <- liftIO (query conn "select id, labels, properties, a, b from edges where a=?" (Only nodeId))
 
   return (mkNode node ins outs)
  where
-  mkNode (lbls, props) i o = Node (fromPGArray lbls) props (map mkEdge i) (map mkEdge o)
-  mkEdge (lbls, props, a, b) = Edge (fromPGArray lbls) props a b
+  mkNode (id_, lbls, props) i o = Node id_ (fromPGArray lbls) props (map mkEdge i) (map mkEdge o)
+  mkEdge (id_, lbls, props, a, b) = Edge id_ (fromPGArray lbls) props a b
 
 getEdge :: Env -> Int -> Handler Edge
 getEdge env edgeId = withResource (envDbPool env) $ \conn -> do
-  rows <- liftIO $ query conn "select labels, properties, a, b from edges where id=?" (Only edgeId)
+  rows <- liftIO $ query conn "select id, labels, properties, a, b from edges where id=?" (Only edgeId)
   case rows of
     [] -> throwError $ err404{errBody = "Edge not found"}
     [edge] -> return (mkEdge edge)
     _ -> throwError $ err500{errBody = "Multiple edges for id"}
  where
-  mkEdge (lbls, props, a, b) = Edge (fromPGArray lbls) props a b
+  mkEdge (id_, lbls, props, a, b) = Edge id_ (fromPGArray lbls) props a b
 
 -- Main
 
