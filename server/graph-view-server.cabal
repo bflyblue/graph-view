@@ -69,9 +69,11 @@ executable graph-view-server
   build-depends:
     , aeson
     , base                  ^>=4.16.3.0
+    , lucid
     , optparse-applicative
     , postgresql-simple
     , resource-pool
+    , servant-lucid
     , servant-server
     , text
     , warp

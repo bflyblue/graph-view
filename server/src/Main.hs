@@ -1,17 +1,25 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 module Main where
 
+import Control.Monad (forM_)
 import Control.Monad.IO.Class (liftIO)
-import Data.Aeson (ToJSON (..), Value, object, (.=))
+import Data.Aeson (ToJSON (..), Value (..), object, (.=))
+import Data.Aeson.Key qualified as Key
+import Data.Aeson.KeyMap qualified as KeyMap
 import Data.Pool
 import Data.Text (Text)
+import Data.Text qualified as Text
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Simple.Types (fromPGArray)
+import Lucid
+import Lucid.Servant (safeAbsHref_)
 import Network.Wai.Handler.Warp qualified as Warp
 import Options.Applicative
 import Servant
+import Servant.HTML.Lucid
 
 -- Command line options and parser
 
@@ -58,7 +66,10 @@ data Env = Env
 
 -- App
 
-type App = "api" :> Api :<|> Raw
+type App =
+  "api" :> Api
+    :<|> "node" :> Capture "node_id" Int :> Get '[HTML] (Document Node)
+    :<|> Raw
 
 type Api =
   "node" :> Capture "node_id" Int :> Get '[JSON] Node
@@ -100,8 +111,101 @@ instance ToJSON Edge where
       , "b" .= edgeB edge
       ]
 
+newtype Id = Id Int
+
+data Link' a = Link' Text Int
+
+mkId :: Int -> Id
+mkId = Id
+
+instance ToHtml Id where
+  toHtml (Id x) = div_ [class_ "id"] (toHtml (Text.pack $ show x))
+  toHtmlRaw = toHtml
+
+instance ToHtml (Link' Node) where
+  toHtml (Link' txt x) = div_ [class_ "id"] $ a_ [safeAbsHref_ (Proxy :: Proxy App) (Proxy :: Proxy ("node" :> Capture "node_id" Int :> Get '[HTML] (Document Node))) x] (toHtml txt)
+  toHtmlRaw = toHtml
+
+newtype Label = Label Text
+
+instance ToHtml Label where
+  toHtml (Label x) = div_ [class_ "label"] (toHtml x)
+  toHtmlRaw = toHtml
+
+newtype Labels = Labels [Label]
+
+instance ToHtml Labels where
+  toHtml (Labels xs) = div_ [class_ "labels"] (mapM_ toHtml xs)
+  toHtmlRaw = toHtml
+
+newtype Properties = Properties Value
+
+instance ToHtml Properties where
+  toHtml (Properties xs) = div_ [class_ "properties"] (toHtml xs)
+  toHtmlRaw = toHtml
+
+instance ToHtml Value where
+  toHtml (String x) = div_ [classes_ ["value", "string"]] (toHtml x)
+  toHtml (Number x) = div_ [classes_ ["value", "number"]] (toHtml $ show x)
+  toHtml (Bool x) = div_ [classes_ ["value", "bool"]] (if x then "True" else "False")
+  toHtml Null = div_ [classes_ ["value", "null"]] "Null"
+  toHtml (Array xs) = div_ [classes_ ["value", "array"]] (mapM_ toHtml xs)
+  toHtml (Object xs) = div_ [classes_ ["value", "object"]] (KeyMap.foldMapWithKey property xs)
+  toHtmlRaw = toHtml
+
+property :: Monad m => Key.Key -> Value -> HtmlT m ()
+property key val = do
+  div_ [class_ "key"] (toHtml $ Key.toText key)
+  div_ [class_ "val"] (toHtml val)
+
+instance ToHtml Node where
+  toHtml node = div_ [class_ "in-node-out"] $ do
+    div_ [class_ "edges in"] $ do
+      forM_ (nodeIn node) $ \edge -> do
+        div_ [class_ "edge"] $ do
+          toHtml $ Link' @Node (Text.pack $ show $ edgeA edge) (edgeA edge)
+          toHtml $ Labels $ map Label (edgeLabels edge)
+    div_ [class_ "node"] $ do
+      toHtml $ mkId $ nodeId node
+      toHtml $ Labels $ map Label (nodeLabels node)
+      toHtml $ Properties $ nodeProperties node
+    div_ [class_ "edges out"] $ do
+      forM_ (nodeOut node) $ \edge -> do
+        div_ [class_ "edge"] $ do
+          toHtml $ Link' @Node (Text.pack $ show $ edgeB edge) (edgeB edge)
+          toHtml $ Labels $ map Label (edgeLabels edge)
+
+  toHtmlRaw = toHtml
+
+{-
+instance ToHtml Node where
+  toHtml node = div_ [class_ "node"] $ do
+    toHtml $ mkId $ nodeId node
+    toHtml $ Labels $ map Label (nodeLabels node)
+    toHtml $ Properties $ nodeProperties node
+  toHtmlRaw = toHtml
+-}
+
+newtype Document a = Document a
+
+instance ToHtml a => ToHtml (Document a) where
+  toHtml (Document a) = do
+    doctype_
+    html_ [lang_ "en-US"] $ do
+      head_ $ do
+        title_ "Graph View"
+        link_ [href_ "/css/style.css", rel_ "stylesheet"]
+        link_ [href_ "https://fonts.googleapis.com/css?family=Roboto Condensed", rel_ "stylesheet"]
+        meta_ [charset_ "utf-8"]
+        meta_ [name_ "viewport", content_ "width=device-width"]
+      body_ $ toHtml a
+  toHtmlRaw = toHtml
+
 app :: Env -> Server App
-app env = api env :<|> serveDirectoryFileServer (webroot $ envOptions env)
+app env =
+  api env
+    :<|> fmap Document . getNode env
+    :<|> serveDirectoryFileServer (webroot $ envOptions env)
 
 api :: Env -> Server Api
 api env = getNode env :<|> getEdge env
@@ -119,8 +223,8 @@ getNode env nodeId = withResource (envDbPool env) $ \conn -> do
 
   return (mkNode node ins outs)
  where
-  mkNode (id_, lbls, props) i o = Node id_ (fromPGArray lbls) props (map mkEdge i) (map mkEdge o)
-  mkEdge (id_, lbls, props, a, b) = Edge id_ (fromPGArray lbls) props a b
+  mkNode (id', lbls, props) i o = Node id' (fromPGArray lbls) props (map mkEdge i) (map mkEdge o)
+  mkEdge (id', lbls, props, a, b) = Edge id' (fromPGArray lbls) props a b
 
 getEdge :: Env -> Int -> Handler Edge
 getEdge env edgeId = withResource (envDbPool env) $ \conn -> do
@@ -130,7 +234,7 @@ getEdge env edgeId = withResource (envDbPool env) $ \conn -> do
     [edge] -> return (mkEdge edge)
     _ -> throwError $ err500{errBody = "Multiple edges for id"}
  where
-  mkEdge (id_, lbls, props, a, b) = Edge id_ (fromPGArray lbls) props a b
+  mkEdge (id', lbls, props, a, b) = Edge id' (fromPGArray lbls) props a b
 
 -- Main
 
