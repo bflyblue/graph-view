@@ -1,8 +1,21 @@
 .in-node-out {
-  display: flex;
-  flex-direction: row;
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
   align-items: flex-start;
   gap: 2em;
+}
+
+.header {
+  grid-column: 1 / -1;
+  border: dashed 1px;
+}
+
+.nodes {
+  display: flex;
+  flex-direction: column;
+  flex: 2;
+  min-width: 20em;
+  gap: 1em;
 }
 
 .edges {
@@ -55,8 +68,7 @@
 .node {
   display: flex;
   flex-direction: column;
-  flex: 2;
-  min-width: 20em;
+  width: 100%;
   border: solid 2px;
   border-radius: 16px;
   font-family: 'Roboto Condensed', sans-serif;
@@ -119,7 +131,7 @@
   padding: 2px 1em;
 }
 
-.id a {
+a {
   color: currentColor;
   cursor: pointer;
 }

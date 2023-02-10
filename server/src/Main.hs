@@ -4,16 +4,17 @@
 
 module Main where
 
-import Control.Monad (forM_)
+import Control.Monad (forM, forM_)
 import Control.Monad.IO.Class (liftIO)
 import Data.Aeson (ToJSON (..), Value (..), object, (.=))
 import Data.Aeson.Key qualified as Key
 import Data.Aeson.KeyMap qualified as KeyMap
+import Data.List (intersperse)
 import Data.Pool
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Database.PostgreSQL.Simple
-import Database.PostgreSQL.Simple.Types (fromPGArray)
+import Database.PostgreSQL.Simple.Types (PGArray (..), fromPGArray)
 import Lucid
 import Lucid.Servant (safeAbsHref_)
 import Network.Wai.Handler.Warp qualified as Warp
@@ -68,7 +69,8 @@ data Env = Env
 
 type App =
   "api" :> Api
-    :<|> "node" :> Capture "node_id" Int :> Get '[HTML] (Document Node)
+    :<|> "node" :> Capture "node_id" Int :> Get '[HTML] (Document (InOut Node))
+    :<|> "nodelabel" :> Capture "label" Text :> Get '[HTML] (Document (InOut [Node]))
     :<|> Raw
 
 type Api =
@@ -111,32 +113,20 @@ instance ToJSON Edge where
       , "b" .= edgeB edge
       ]
 
-newtype Id = Id Int
+id' :: Monad m => ToHtml a => a -> HtmlT m ()
+id' a = div_ [class_ "id"] (toHtml a)
 
-data Link' a = Link' Text Int
+labels :: Monad m => ToHtml a => a -> HtmlT m ()
+labels a = div_ [class_ "labels"] (toHtml a)
 
-mkId :: Int -> Id
-mkId = Id
+label :: Monad m => ToHtml a => a -> HtmlT m ()
+label a = div_ [class_ "label"] (toHtml a)
 
-instance ToHtml Id where
-  toHtml (Id x) = div_ [class_ "id"] (toHtml (Text.pack $ show x))
-  toHtmlRaw = toHtml
+nodeLink :: Monad m => Int -> Text -> HtmlT m ()
+nodeLink nodeId txt = a_ [safeAbsHref_ (Proxy :: Proxy App) (Proxy :: Proxy ("node" :> Capture "node_id" Int :> Get '[HTML] (Document (InOut Node)))) nodeId] (toHtml txt)
 
-instance ToHtml (Link' Node) where
-  toHtml (Link' txt x) = div_ [class_ "id"] $ a_ [safeAbsHref_ (Proxy :: Proxy App) (Proxy :: Proxy ("node" :> Capture "node_id" Int :> Get '[HTML] (Document Node))) x] (toHtml txt)
-  toHtmlRaw = toHtml
-
-newtype Label = Label Text
-
-instance ToHtml Label where
-  toHtml (Label x) = div_ [class_ "label"] (toHtml x)
-  toHtmlRaw = toHtml
-
-newtype Labels = Labels [Label]
-
-instance ToHtml Labels where
-  toHtml (Labels xs) = div_ [class_ "labels"] (mapM_ toHtml xs)
-  toHtmlRaw = toHtml
+nodeLabelLink :: Monad m => Text -> Text -> HtmlT m ()
+nodeLabelLink lbl txt = a_ [safeAbsHref_ (Proxy :: Proxy App) (Proxy :: Proxy ("nodelabel" :> Capture "label" Text :> Get '[HTML] (Document (InOut [Node])))) lbl] (toHtml txt)
 
 newtype Properties = Properties Value
 
@@ -159,32 +149,28 @@ property key val = do
   div_ [class_ "val"] (toHtml val)
 
 instance ToHtml Node where
-  toHtml node = div_ [class_ "in-node-out"] $ do
+  toHtml node = do
     div_ [class_ "edges in"] $ do
       forM_ (nodeIn node) $ \edge -> do
         div_ [class_ "edge"] $ do
-          toHtml $ Link' @Node (Text.pack $ show $ edgeA edge) (edgeA edge)
-          toHtml $ Labels $ map Label (edgeLabels edge)
-    div_ [class_ "node"] $ do
-      toHtml $ mkId $ nodeId node
-      toHtml $ Labels $ map Label (nodeLabels node)
-      toHtml $ Properties $ nodeProperties node
+          id' $ nodeLink (edgeA edge) (Text.pack $ show $ edgeA edge)
+          labels (mapM_ (label . toHtml) $ edgeLabels edge)
+    div_ [class_ "nodes"] $ do
+      div_ [class_ "node"] $ do
+        id' $ Text.pack $ show $ nodeId node
+        labels (mapM_ (\lbl -> label $ nodeLabelLink lbl lbl) $ nodeLabels node)
+        toHtml $ Properties $ nodeProperties node
     div_ [class_ "edges out"] $ do
       forM_ (nodeOut node) $ \edge -> do
         div_ [class_ "edge"] $ do
-          toHtml $ Link' @Node (Text.pack $ show $ edgeB edge) (edgeB edge)
-          toHtml $ Labels $ map Label (edgeLabels edge)
+          id' $ nodeLink (edgeB edge) (Text.pack $ show $ edgeB edge)
+          labels (mapM_ (label . toHtml) $ edgeLabels edge)
 
   toHtmlRaw = toHtml
 
-{-
-instance ToHtml Node where
-  toHtml node = div_ [class_ "node"] $ do
-    toHtml $ mkId $ nodeId node
-    toHtml $ Labels $ map Label (nodeLabels node)
-    toHtml $ Properties $ nodeProperties node
+instance ToHtml [Node] where
+  toHtml nodes = mconcat (intersperse (div_ [class_ "header"] mempty) (map toHtml nodes))
   toHtmlRaw = toHtml
--}
 
 newtype Document a = Document a
 
@@ -201,10 +187,17 @@ instance ToHtml a => ToHtml (Document a) where
       body_ $ toHtml a
   toHtmlRaw = toHtml
 
+newtype InOut a = InOut a
+
+instance ToHtml a => ToHtml (InOut a) where
+  toHtml (InOut a) = div_ [class_ "in-node-out"] $ toHtml a
+  toHtmlRaw = toHtml
+
 app :: Env -> Server App
 app env =
   api env
-    :<|> fmap Document . getNode env
+    :<|> fmap (Document . InOut) . getNode env
+    :<|> fmap (Document . InOut) . getNodesLabelled env
     :<|> serveDirectoryFileServer (webroot $ envOptions env)
 
 api :: Env -> Server Api
@@ -223,8 +216,8 @@ getNode env nodeId = withResource (envDbPool env) $ \conn -> do
 
   return (mkNode node ins outs)
  where
-  mkNode (id', lbls, props) i o = Node id' (fromPGArray lbls) props (map mkEdge i) (map mkEdge o)
-  mkEdge (id', lbls, props, a, b) = Edge id' (fromPGArray lbls) props a b
+  mkNode (nid, lbls, props) i o = Node nid (fromPGArray lbls) props (map mkEdge i) (map mkEdge o)
+  mkEdge (eid, lbls, props, a, b) = Edge eid (fromPGArray lbls) props a b
 
 getEdge :: Env -> Int -> Handler Edge
 getEdge env edgeId = withResource (envDbPool env) $ \conn -> do
@@ -234,7 +227,18 @@ getEdge env edgeId = withResource (envDbPool env) $ \conn -> do
     [edge] -> return (mkEdge edge)
     _ -> throwError $ err500{errBody = "Multiple edges for id"}
  where
-  mkEdge (id', lbls, props, a, b) = Edge id' (fromPGArray lbls) props a b
+  mkEdge (eid, lbls, props, a, b) = Edge eid (fromPGArray lbls) props a b
+
+getNodesLabelled :: Env -> Text -> Handler [Node]
+getNodesLabelled env label = withResource (envDbPool env) $ \conn -> do
+  nodes <- liftIO (query conn "select id, labels, properties from nodes where labels @> ?" (Only $ PGArray [label]))
+  forM nodes $ \node@(nodeId, _, _) -> do
+    ins <- liftIO (query conn "select id, labels, properties, a, b from edges where b=?" (Only nodeId))
+    outs <- liftIO (query conn "select id, labels, properties, a, b from edges where a=?" (Only nodeId))
+    return (mkNode node ins outs)
+ where
+  mkNode (nid, lbls, props) i o = Node nid (fromPGArray lbls) props (map mkEdge i) (map mkEdge o)
+  mkEdge (eid, lbls, props, a, b) = Edge eid (fromPGArray lbls) props a b
 
 -- Main
 
