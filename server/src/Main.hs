@@ -74,7 +74,8 @@ type App =
     :<|> Raw
 
 type Api =
-  "node" :> Capture "node_id" Int :> Get '[JSON] Node
+  "graph" :> Get '[JSON] [Node]
+    :<|> "node" :> Capture "node_id" Int :> Get '[JSON] Node
     :<|> "edge" :> Capture "edge_id" Int :> Get '[JSON] Edge
 
 data Node = Node
@@ -201,12 +202,23 @@ app env =
     :<|> serveDirectoryFileServer (webroot $ envOptions env)
 
 api :: Env -> Server Api
-api env = getNode env :<|> getEdge env
+api env = getGraph env :<|> getNode env :<|> getEdge env
 
 single :: [a] -> Handler a
 single [] = throwError err404
 single [x] = return x
 single _ = throwError err500
+
+getGraph :: Env -> Handler [Node]
+getGraph env = withResource (envDbPool env) $ \conn -> do
+  nodes <- liftIO (query_ conn "select id, labels, properties from nodes")
+  forM nodes $ \node@(nodeId, _, _) -> do
+    ins <- liftIO (query conn "select id, labels, properties, a, b from edges where b=?" (Only nodeId))
+    outs <- liftIO (query conn "select id, labels, properties, a, b from edges where a=?" (Only nodeId))
+    return (mkNode node ins outs)
+ where
+  mkNode (nid, lbls, props) i o = Node nid (fromPGArray lbls) props (map mkEdge i) (map mkEdge o)
+  mkEdge (eid, lbls, props, a, b) = Edge eid (fromPGArray lbls) props a b
 
 getNode :: Env -> Int -> Handler Node
 getNode env nodeId = withResource (envDbPool env) $ \conn -> do

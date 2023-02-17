@@ -1,107 +1,144 @@
-const main = () => {
-  // Find the canvas element
-  const canvas = document.querySelector("#canvas");
+import * as d3 from "d3";
 
-  if (!(canvas instanceof HTMLCanvasElement)) {
-    throw new Error("No html canvas element.");
-  }
+type Node = d3.SimulationNodeDatum & {
+  id: number;
+};
 
-  // WebGL rendering context
-  const gl = canvas.getContext("webgl");
+type Edge = d3.SimulationLinkDatum<Node> & {};
 
-  if (!gl) {
-    throw new Error("Unable to initialize WebGL.");
-  }
+type ApiGraph = ApiNode[];
 
-  // Clear color
-  gl.clearColor(0, 0, 0, 0);
-  gl.clear(gl.COLOR_BUFFER_BIT);
+type ApiNode = {
+  node_id: number;
+  labels: string[];
+  properties: object;
+  in: ApiEdge[];
+  out: ApiEdge[];
+};
 
-  // A user-defined function to create and compile shaders
-  const initShader = (
-    type: "VERTEX_SHADER" | "FRAGMENT_SHADER",
-    source: string
-  ) => {
-    const shader = gl.createShader(gl[type]);
+type ApiEdge = {
+  edge_id: number;
+  labels: string[];
+  properties: object;
+  a: number;
+  b: number;
+};
 
-    if (!shader) {
-      throw new Error("Unable to create a shader.");
-    }
+const graph = (nodes: Node[], edges: Edge[]) => {
+  const svg = d3.create("svg").attr("viewBox", [-1000, -1000, 2000, 2000]);
 
-    gl.shaderSource(shader, source);
+  const link = svg
+    .append("g")
+    .attr("stroke", "#000")
+    .attr("stroke-width", 1)
+    .selectAll("line")
+    .data(edges)
+    .join("line");
 
-    gl.compileShader(shader);
+  const node = svg
+    .append("g")
+    .attr("fill", "#272")
+    .attr("stroke", "#000")
+    .attr("stroke-width", 1)
+    .selectAll("circle")
+    .data(nodes)
+    .join("circle")
+    .attr("r", 5);
 
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-      throw new Error(
-        `An error occurred compiling the shaders: ${gl.getShaderInfoLog(
-          shader
-        )}`
-      );
-    }
+  const text = svg
+    .append("g")
+    .attr("text-anchor", "middle")
+    .attr("font-size", 5)
+    .selectAll("text")
+    .data(nodes)
+    .join("text")
+    .text((d) => d.id);
 
-    return shader;
+  const ticked = () => {
+    link
+      .attr("x1", (d) => ((d! as Edge).source! as Node).x!)
+      .attr("y1", (d) => ((d! as Edge).source! as Node).y!)
+      .attr("x2", (d) => ((d! as Edge).target! as Node).x!)
+      .attr("y2", (d) => ((d! as Edge).target! as Node).y!);
+    node.attr("cx", (d) => (d! as Node).x!).attr("cy", (d) => (d! as Node).y!);
+    text
+      .attr("x", (d) => (d! as Node).x!)
+      .attr("y", (d) => (d! as Node).y! + 2);
   };
 
-  // Vertex shader
-  const vertexShader = initShader(
-    "VERTEX_SHADER",
-    `
-    attribute vec4 a_position;
+  const zooming = d3
+    .zoom<SVGSVGElement, undefined>()
+    .scaleExtent([1, 8])
+    .on("zoom", (event) => {
+      link
+        .attr("transform", event.transform)
+        .attr("stroke-width", 1 / event.transform.k);
+      node
+        .attr("transform", event.transform)
+        .attr("stroke-width", 1 / Math.sqrt(event.transform.k));
+      text.attr("transform", event.transform);
+    });
 
-    void main() {
-      gl_Position = a_position;
-    }
-  `
-  );
+  const drag = (simulation: d3.Simulation<Node, Edge>) => {
+    const dragstarted = (event: any) => {
+      if (!event.active) simulation.alphaTarget(0.3).restart();
+      event.subject.fx = event.subject.x;
+      event.subject.fy = event.subject.y;
+    };
 
-  // Fragment shader
-  const fragmentShader = initShader(
-    "FRAGMENT_SHADER",
-    `
-    void main() {
-      gl_FragColor = vec4(0, 0, 0, 1);
-    }
-  `
-  );
+    const dragged = (event: any) => {
+      event.subject.fx = event.x;
+      event.subject.fy = event.y;
+    };
 
-  // WebGL program
-  const program = gl.createProgram();
+    const dragended = (event: any) => {
+      if (!event.active) simulation.alphaTarget(0);
+      event.subject.fx = null;
+      event.subject.fy = null;
+    };
 
-  if (!program) {
-    throw new Error("Unable to create the program.");
-  }
+    return d3
+      .drag<SVGSVGElement, undefined>()
+      .on("start", dragstarted)
+      .on("drag", dragged)
+      .on("end", dragended);
+  };
 
-  gl.attachShader(program, vertexShader);
-  gl.attachShader(program, fragmentShader);
+  const simulation = d3
+    .forceSimulation(nodes)
+    .force(
+      "link",
+      d3.forceLink(edges).id((d) => (d as Node).id)
+    )
+    .force("charge", d3.forceManyBody())
+    .force("x", d3.forceX())
+    .force("y", d3.forceY())
+    .on("tick", ticked);
 
-  gl.linkProgram(program);
+  // svg.call(drag(simulation));
+  svg.call(zooming);
 
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    throw new Error(
-      `Unable to link the shaders: ${gl.getProgramInfoLog(program)}`
-    );
-  }
-
-  gl.useProgram(program);
-
-  // Vertext buffer
-  const positionBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-
-  const positions = [0, 1, 0.866, -0.5, -0.866, -0.5];
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
-
-  const index = gl.getAttribLocation(program, "a_position");
-  const size = 2;
-  const type = gl.FLOAT;
-  const normalized = false;
-  const stride = 0;
-  const offset = 0;
-  gl.vertexAttribPointer(index, size, type, normalized, stride, offset);
-  gl.enableVertexAttribArray(index);
-
-  // Draw the scene
-  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  return svg.node();
 };
-window.onload = main;
+
+const main = async () => {
+  const data: ApiGraph | undefined = await d3.json(
+    "http://neptune:8080/api/graph"
+  );
+  if (data) {
+    const div = d3.select("#graph");
+    const nodes: Node[] = data.map((n) => ({ id: n.node_id }));
+    const edges: Edge[] = data.flatMap((n) =>
+      d3.map(n.in, (e) => ({ source: e.a, target: e.b }))
+    );
+    div.append(() => graph(nodes, edges));
+  }
+};
+
+(async () => {
+  try {
+    await main();
+  } catch (e) {
+    console.log(e);
+  }
+})();
