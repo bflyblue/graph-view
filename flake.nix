@@ -8,39 +8,50 @@
       url = "github:edolstra/flake-compat";
       flake = false;
     };
-    web = { url = "path:web"; };
-    server = { url = "path:server"; };
   };
 
-  outputs = { self, nixpkgs, flake-utils, web, server, ... }:
+  outputs = { self, nixpkgs, flake-utils, ... }:
     let
-      # pkgs = import nixpkgs { system = "x86_64-linux"; };
       supportedSystems = [ "x86_64-linux" ];
       forallSystems = nixpkgs.lib.genAttrs supportedSystems;
-      nixpkgsFor = forallSystems (system: import nixpkgs { inherit system; });
+      nixpkgsFor = system: import nixpkgs { inherit system; };
     in {
       packages = forallSystems (system:
         let
-          pkgs = nixpkgsFor.${system};
-          graph-view-server = server.packages.${system}.default;
-          graph-view-web = pkgs.runCommandLocal "graph-view-web" { } ''
-            mkdir -p "$out"
-            cp -r ${web.packages.x86_64-linux.default}/lib/node_modules/graph-view/dist/* "$out"
+          pkgs = nixpkgsFor system;
+          haskellPackages = pkgs.haskellPackages;
+        in rec {
+          graph-view-server =
+            haskellPackages.callCabal2nix "graph-view-server" ./server { };
+          graph-view-web = pkgs.buildNpmPackage {
+            pname = "graph-view-web";
+            version = "0.1.0";
+            src = ./web;
+            npmDepsHash = "sha256-pWwYiNCHGKHzpWWCmHiisI/hJGxwndljDVqpkFRyyNo=";
+            installPhase = ''
+              mv dist $out
+            '';
+          };
+          graph-view = pkgs.writeShellScriptBin "graph-view" ''
+            ${graph-view-server}/bin/graph-view-server --webroot ${graph-view-web}
           '';
-        in {
-          inherit graph-view-server graph-view-web;
-          graph-view = pkgs.writeShellScriptBin "graph-view"
-            "${graph-view-server}/bin/graph-view-server --webroot ${graph-view-web}";
-          default = self.packages.${system}.graph-view;
+          default = graph-view;
+
         });
       devShells = forallSystems (system:
-        let pkgs = nixpkgsFor.${system};
+        let
+          pkgs = nixpkgsFor system;
+          haskellPackages = pkgs.haskellPackages;
+          hls = pkgs.haskell-language-server.override { dynamic = true; };
         in {
+          graph-view-server = haskellPackages.shellFor {
+            packages = p: [ self.packages.${system}.graph-view-server ];
+            buildInputs = [ haskellPackages.cabal-install hls ];
+            withHoogle = true;
+          };
           default = pkgs.mkShell {
-            inputsFrom = [
-              server.devShells.${system}.default
-              web.devShells.${system}.default
-            ];
+            inputsFrom = [ self.devShells.${system}.graph-view-server ];
+            nativeBuildInputs = with pkgs; [ nodejs ];
           };
         });
     };

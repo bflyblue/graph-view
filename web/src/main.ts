@@ -24,84 +24,65 @@ type ApiEdge = {
   b: number;
 };
 
+const sourceNode = (d: Edge) => d.source as Node;
+const targetNode = (d: Edge) => d.target as Node;
+
 const graph = (nodes: Node[], edges: Edge[]) => {
-  const svg = d3.create("svg").attr("viewBox", [-1000, -1000, 2000, 2000]);
+  const width = 2000,
+    height = 2000;
 
-  const link = svg
-    .append("g")
-    .attr("stroke", "#000")
-    .attr("stroke-width", 1)
-    .selectAll("line")
-    .data(edges)
-    .join("line");
+  var tx = 0,
+    ty = 0,
+    s = 1;
 
-  const node = svg
-    .append("g")
-    .attr("fill", "#272")
-    .attr("stroke", "#000")
-    .attr("stroke-width", 1)
-    .selectAll("circle")
-    .data(nodes)
-    .join("circle")
-    .attr("r", 5);
+  const canvas = d3
+    .create("canvas")
+    .attr("width", width)
+    .attr("height", height);
 
-  const text = svg
-    .append("g")
-    .attr("text-anchor", "middle")
-    .attr("font-size", 5)
-    .selectAll("text")
-    .data(nodes)
-    .join("text")
-    .text((d) => d.id);
+  const ctx = canvas.node()!.getContext("2d")!;
 
-  const ticked = () => {
-    link
-      .attr("x1", (d) => ((d! as Edge).source! as Node).x!)
-      .attr("y1", (d) => ((d! as Edge).source! as Node).y!)
-      .attr("x2", (d) => ((d! as Edge).target! as Node).x!)
-      .attr("y2", (d) => ((d! as Edge).target! as Node).y!);
-    node.attr("cx", (d) => (d! as Node).x!).attr("cy", (d) => (d! as Node).y!);
-    text
-      .attr("x", (d) => (d! as Node).x!)
-      .attr("y", (d) => (d! as Node).y! + 2);
+  ctx.strokeStyle = "black";
+  ctx.lineWidth = 0.2;
+
+  const drawLinks = () => {
+    ctx.save();
+    ctx.fillStyle = "transparent";
+    ctx.lineWidth = 0.1;
+    ctx.beginPath();
+    edges.forEach((d) => {
+      ctx.moveTo(sourceNode(d).x!, sourceNode(d).y!);
+      ctx.lineTo(targetNode(d).x!, targetNode(d).y!);
+    });
+    ctx.stroke();
+    ctx.restore();
   };
 
-  const zooming = d3
-    .zoom<SVGSVGElement, undefined>()
-    .scaleExtent([1, 8])
-    .on("zoom", (event) => {
-      link
-        .attr("transform", event.transform)
-        .attr("stroke-width", 1 / event.transform.k);
-      node
-        .attr("transform", event.transform)
-        .attr("stroke-width", 1 / Math.sqrt(event.transform.k));
-      text.attr("transform", event.transform);
+  const drawNodes = () => {
+    ctx.save();
+    ctx.font = "3px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    nodes.forEach((d, i) => {
+      ctx.fillStyle = "green";
+      ctx.beginPath();
+      ctx.arc(d.x!, d.y!, 5, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "white";
+      ctx.fillText(d.id.toString(), d.x!, d.y!);
     });
+    ctx.restore();
+  };
 
-  const drag = (simulation: d3.Simulation<Node, Edge>) => {
-    const dragstarted = (event: any) => {
-      if (!event.active) simulation.alphaTarget(0.3).restart();
-      event.subject.fx = event.subject.x;
-      event.subject.fy = event.subject.y;
-    };
-
-    const dragged = (event: any) => {
-      event.subject.fx = event.x;
-      event.subject.fy = event.y;
-    };
-
-    const dragended = (event: any) => {
-      if (!event.active) simulation.alphaTarget(0);
-      event.subject.fx = null;
-      event.subject.fy = null;
-    };
-
-    return d3
-      .drag<SVGSVGElement, undefined>()
-      .on("start", dragstarted)
-      .on("drag", dragged)
-      .on("end", dragended);
+  const ticked = () => {
+    ctx.resetTransform();
+    ctx.clearRect(0, 0, width, height);
+    ctx.translate(tx, ty);
+    ctx.scale(s, s);
+    ctx.translate(width / 2, height / 2);
+    drawLinks();
+    drawNodes();
   };
 
   const simulation = d3
@@ -115,10 +96,19 @@ const graph = (nodes: Node[], edges: Edge[]) => {
     .force("y", d3.forceY())
     .on("tick", ticked);
 
-  // svg.call(drag(simulation));
-  svg.call(zooming);
+  const zoom = d3
+    .zoom<HTMLCanvasElement, undefined>()
+    .scaleExtent([1, 8])
+    .on("zoom", (event) => {
+      tx = event.transform.x;
+      ty = event.transform.y;
+      s = event.transform.k;
+      ticked();
+    });
 
-  return svg.node();
+  canvas.call(zoom);
+
+  return canvas.node();
 };
 
 const main = async () => {
