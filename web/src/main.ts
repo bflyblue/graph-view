@@ -28,19 +28,20 @@ const sourceNode = (d: Edge) => d.source as Node;
 const targetNode = (d: Edge) => d.target as Node;
 
 const graph = (nodes: Node[], edges: Edge[]) => {
-  const width = 2000,
-    height = 2000;
-
   var tx = 0,
     ty = 0,
-    s = 1;
+    s = 1,
+    hover: Node | undefined = undefined;
 
-  const canvas = d3
-    .create("canvas")
-    .attr("width", width)
-    .attr("height", height);
-
+  const canvas = d3.create("canvas");
   const ctx = canvas.node()!.getContext("2d")!;
+
+  const observer = new ResizeObserver((_entries) => {
+    const n = canvas.node()!;
+    n.width = n.clientWidth;
+    n.height = n.clientHeight;
+  });
+  observer.observe(canvas.node()!);
 
   ctx.strokeStyle = "black";
   ctx.lineWidth = 0.2;
@@ -64,7 +65,11 @@ const graph = (nodes: Node[], edges: Edge[]) => {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     nodes.forEach((d, i) => {
-      ctx.fillStyle = "green";
+      if (d === hover) {
+        ctx.fillStyle = "red";
+      } else {
+        ctx.fillStyle = "green";
+      }
       ctx.beginPath();
       ctx.arc(d.x!, d.y!, 5, 0, 2 * Math.PI);
       ctx.fill();
@@ -75,7 +80,8 @@ const graph = (nodes: Node[], edges: Edge[]) => {
     ctx.restore();
   };
 
-  const ticked = () => {
+  const draw = () => {
+    const { width, height } = canvas.node()!;
     ctx.resetTransform();
     ctx.clearRect(0, 0, width, height);
     ctx.translate(tx, ty);
@@ -83,6 +89,7 @@ const graph = (nodes: Node[], edges: Edge[]) => {
     ctx.translate(width / 2, height / 2);
     drawLinks();
     drawNodes();
+    window.requestAnimationFrame(draw);
   };
 
   const simulation = d3
@@ -93,8 +100,7 @@ const graph = (nodes: Node[], edges: Edge[]) => {
     )
     .force("charge", d3.forceManyBody())
     .force("x", d3.forceX())
-    .force("y", d3.forceY())
-    .on("tick", ticked);
+    .force("y", d3.forceY());
 
   const zoom = d3
     .zoom<HTMLCanvasElement, undefined>()
@@ -103,10 +109,19 @@ const graph = (nodes: Node[], edges: Edge[]) => {
       tx = event.transform.x;
       ty = event.transform.y;
       s = event.transform.k;
-      ticked();
     });
 
+  canvas.on("mousedown", (event) => {
+    const { width, height } = canvas.node()!;
+    const p = d3.pointer(event, canvas.node());
+    const l = [(p[0] - tx) / s - width / 2, (p[1] - ty) / s - height / 2];
+    console.log(p, l);
+    hover = simulation.find(l[0]!, l[1]!, 10);
+  });
+
   canvas.call(zoom);
+
+  draw();
 
   return canvas.node();
 };

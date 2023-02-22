@@ -1,4 +1,29 @@
+html, body {
+  height: 100%;
+  margin: 0px;
+  padding: 0px;
+}
+
+canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: auto 200px;
+  width: 100%;
+  height: 100%;
+  margin: 0px;
+  padding: 0px;
+}
+
 #graph {
-  width: auto;
-  height: auto;
+  border: solid 1px;
+  padding: 0px;
+}
+
+#details {
+  border: solid 1px;
 }

@@ -33,7 +33,7 @@
             '';
           };
           graph-view = pkgs.writeShellScriptBin "graph-view" ''
-            ${graph-view-server}/bin/graph-view-server --webroot ${graph-view-web}
+            ${graph-view-server}/bin/graph-view-server --webroot ${graph-view-web} "$@"
           '';
           default = graph-view;
 
