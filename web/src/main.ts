@@ -27,7 +27,10 @@ type ApiEdge = {
 const sourceNode = (d: Edge) => d.source as Node;
 const targetNode = (d: Edge) => d.target as Node;
 
+var selectedNode: number | undefined = undefined;
+
 const selectNode = async (id: number | undefined) => {
+  selectedNode = id;
   const details = d3.select("div#details");
   details.selectChildren().remove();
 
@@ -85,8 +88,7 @@ const appendProps = (
 const graph = (nodes: Node[], edges: Edge[]) => {
   var tx = 0,
     ty = 0,
-    s = 1,
-    hover: Node | undefined = undefined;
+    s = 1;
 
   const canvas = d3.create("canvas");
   const ctx = canvas.node()!.getContext("2d")!;
@@ -119,8 +121,8 @@ const graph = (nodes: Node[], edges: Edge[]) => {
     ctx.font = "3px sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    nodes.forEach((d, i) => {
-      if (d === hover) {
+    nodes.forEach((d, _i) => {
+      if (d.id === selectedNode) {
         ctx.fillStyle = "red";
       } else {
         ctx.fillStyle = "green";
@@ -166,12 +168,14 @@ const graph = (nodes: Node[], edges: Edge[]) => {
       s = event.transform.k;
     });
 
-  canvas.on("mousedown", async (event) => {
-    const { width, height } = canvas.node()!;
-    const p = d3.pointer(event, canvas.node());
-    const l = [(p[0] - tx) / s - width / 2, (p[1] - ty) / s - height / 2];
-    hover = simulation.find(l[0]!, l[1]!, 5);
-    await selectNode(hover?.id);
+  canvas.on("click", async (event) => {
+    if (event.detail === 1) {
+      const { width, height } = canvas.node()!;
+      const p = d3.pointer(event, canvas.node());
+      const l = [(p[0] - tx) / s - width / 2, (p[1] - ty) / s - height / 2];
+      const clicked = simulation.find(l[0]!, l[1]!, 5);
+      await selectNode(clicked?.id);
+    }
   });
 
   canvas.call(zoom);
