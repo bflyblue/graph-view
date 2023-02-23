@@ -32,26 +32,25 @@ var selectedNode: number | undefined = undefined;
 const selectNode = async (id: number | undefined) => {
   selectedNode = id;
   const details = d3.select("div#details");
+
+  const node: ApiNode | undefined =
+    id === undefined
+      ? undefined
+      : await d3.json(`http://neptune:8080/api/node/${id}`);
+
   details.selectChildren().remove();
-
-  if (id !== undefined) {
-    const node: ApiNode | undefined = await d3.json(
-      `http://neptune:8080/api/node/${id}`
-    );
-
-    if (node) {
-      const n = details.append("div").classed("node", true);
-      n.append("div").classed("id", true).html(node.node_id.toString());
-      n.append("div")
-        .classed("labels", true)
-        .selectAll("div")
-        .data(node.labels)
-        .join("div")
-        .classed("label", true)
-        .html((l) => l);
-      const p = n.append("div").classed("properties", true);
-      appendProps(p, node.properties);
-    }
+  if (node) {
+    const n = details.append("div").classed("node", true);
+    n.append("div").classed("id", true).html(node.node_id.toString());
+    n.append("div")
+      .classed("labels", true)
+      .selectAll("div")
+      .data(node.labels)
+      .join("div")
+      .classed("label", true)
+      .html((l) => l);
+    const p = n.append("div").classed("properties", true);
+    appendProps(p, node.properties);
   }
 };
 
@@ -118,7 +117,7 @@ const graph = (nodes: Node[], edges: Edge[]) => {
 
   const drawNodes = () => {
     ctx.save();
-    ctx.font = "3px sans-serif";
+    ctx.font = '3px "Roboto Condensed", serif';
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     nodes.forEach((d, _i) => {
@@ -131,8 +130,10 @@ const graph = (nodes: Node[], edges: Edge[]) => {
       ctx.arc(d.x!, d.y!, 5, 0, 2 * Math.PI);
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = "white";
-      ctx.fillText(d.id.toString(), d.x!, d.y!);
+      if (s > 2) {
+        ctx.fillStyle = "white";
+        ctx.fillText(d.id.toString(), d.x!, d.y! + 0.3);
+      }
     });
     ctx.restore();
   };
