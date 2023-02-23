@@ -27,6 +27,61 @@ type ApiEdge = {
 const sourceNode = (d: Edge) => d.source as Node;
 const targetNode = (d: Edge) => d.target as Node;
 
+const selectNode = async (id: number | undefined) => {
+  const details = d3.select("div#details");
+  details.selectChildren().remove();
+
+  if (id !== undefined) {
+    const node: ApiNode | undefined = await d3.json(
+      `http://neptune:8080/api/node/${id}`
+    );
+
+    if (node) {
+      const n = details.append("div").classed("node", true);
+      n.append("div").classed("id", true).html(node.node_id.toString());
+      n.append("div")
+        .classed("labels", true)
+        .selectAll("div")
+        .data(node.labels)
+        .join("div")
+        .classed("label", true)
+        .html((l) => l);
+      const p = n.append("div").classed("properties", true);
+      appendProps(p, node.properties);
+    }
+  }
+};
+
+const appendProps = (
+  element: d3.Selection<any, unknown, HTMLElement, unknown>,
+  p: any
+) => {
+  const v = element.append("div").classed("value", true);
+  if (p === null) {
+    v.classed("null", true).html("null");
+  } else if (typeof p === "string") {
+    v.classed("string", true).html(p);
+  } else if (typeof p === "symbol") {
+    v.classed("string", true).html(p.toString());
+  } else if (typeof p === "number" || typeof p === "bigint") {
+    v.classed("number", true).html(p.toString());
+  } else if (typeof p === "boolean") {
+    v.classed("bool", true).html(p.toString());
+  } else if (Array.isArray(p)) {
+    const a = v.classed("array", true);
+    for (const k in p) {
+      appendProps(a, p[k]);
+    }
+  } else if (typeof p === "object") {
+    const o = v.classed("object", true);
+    for (const k in p) {
+      o.append("div").classed("key", true).html(k);
+      const v = o.append("div").classed("val", true);
+      appendProps(v, p[k]);
+    }
+  }
+};
+
 const graph = (nodes: Node[], edges: Edge[]) => {
   var tx = 0,
     ty = 0,
@@ -104,19 +159,19 @@ const graph = (nodes: Node[], edges: Edge[]) => {
 
   const zoom = d3
     .zoom<HTMLCanvasElement, undefined>()
-    .scaleExtent([1, 8])
+    .scaleExtent([0.2, 8])
     .on("zoom", (event) => {
       tx = event.transform.x;
       ty = event.transform.y;
       s = event.transform.k;
     });
 
-  canvas.on("mousedown", (event) => {
+  canvas.on("mousedown", async (event) => {
     const { width, height } = canvas.node()!;
     const p = d3.pointer(event, canvas.node());
     const l = [(p[0] - tx) / s - width / 2, (p[1] - ty) / s - height / 2];
-    console.log(p, l);
-    hover = simulation.find(l[0]!, l[1]!, 10);
+    hover = simulation.find(l[0]!, l[1]!, 5);
+    await selectNode(hover?.id);
   });
 
   canvas.call(zoom);

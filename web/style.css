@@ -2,6 +2,7 @@ html, body {
   height: 100%;
   margin: 0px;
   padding: 0px;
+  overflow: hidden;
 }
 
 canvas {
@@ -12,18 +13,85 @@ canvas {
 
 .app {
   display: grid;
-  grid-template-columns: auto 200px;
-  width: 100%;
+  grid-template-columns: auto 600px;
   height: 100%;
   margin: 0px;
   padding: 0px;
 }
 
 #graph {
-  border: solid 1px;
   padding: 0px;
+  border-right: solid 1px;
 }
 
 #details {
+  overflow-x: hidden;
+  overflow-y: scroll;
+  padding-right: 4px;
+}
+
+.node {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border: solid 2px;
+  border-radius: 16px;
+  font-family: 'Roboto Condensed', sans-serif;
+  overflow: hidden;
+}
+
+.node > div {
+  overflow: hidden;
+}
+
+.node .value.object > div {
+  overflow: hidden;
+}
+
+.node .id {
+  padding: 4px 2em;
+  text-align: center;
+  color: white;
+  background-color: black;
+  font-weight: bold;
+}
+
+.node .labels {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  padding: 4px;
+  gap: 0.5em;
+}
+
+.node .labels .label {
   border: solid 1px;
+  border-radius: 8px;
+  padding: 0 0.5em;
+}
+
+.node .properties .value.object {
+  display: grid;
+  grid-template-columns: 1fr 4fr;
+  border-top: solid 1px;
+}
+
+.node .value .value.object {
+  outline: solid 2px;
+  border: 0px;
+  margin: 2px;
+}
+
+.node .properties {
+  font-size: small;
+}
+
+.node .properties .key {
+  text-align: right;
+  border-right: solid 1px;
+  padding: 2px 1em;
+}
+
+.node .properties .val {
+  padding: 2px 1em;
 }
