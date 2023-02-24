@@ -11,12 +11,18 @@ type Edge = d3.SimulationLinkDatum<Node> & {
 
 type ApiGraph = ApiNode[];
 
+type Tag = {
+  key: string;
+  value: string;
+};
+
 type ApiNode = {
   node_id: number;
   labels: string[];
   properties: object;
   in: ApiEdge[];
   out: ApiEdge[];
+  tags: Tag[];
 };
 
 type ApiEdge = {
@@ -25,6 +31,16 @@ type ApiEdge = {
   properties: object;
   a: number;
   b: number;
+};
+
+const lookup = (tags: Tag[], needle: string): string | undefined => {
+  return tags.find((t) => t.key === needle)?.value;
+};
+
+const nodeLabel = (n: Node): string | undefined => {
+  return (
+    lookup(n.node.tags, "Name") || (n.node.properties as any)["functionName"]
+  );
 };
 
 const sourceNode = (d: Edge) => d.source as Node;
@@ -99,30 +115,37 @@ const graph = (nodes: Node[], edges: Edge[]) => {
       ctx.save();
       ctx.font = '3px "Roboto Condensed", serif';
       ctx.textAlign = "start";
-      ctx.textBaseline = "middle";
+      ctx.textBaseline = "top";
 
-      const text = hoverNode.node.labels.toString();
-      const m = ctx.measureText(text);
+      const name = nodeLabel(hoverNode) || hoverNode.id.toString();
+      const type = hoverNode.node.labels.toString();
+      const width = Math.max(
+        ctx.measureText(name).width,
+        ctx.measureText(type).width
+      );
       const x = hoverNode.x + 5;
       const y = hoverNode.y + 5;
 
       ctx.fillStyle = "white";
       ctx.strokeStyle = "black";
 
+      ctx.lineWidth = 0.2 / s;
       ctx.beginPath();
-      ctx.arc(x, y, 3, 0.5 * Math.PI, -0.5 * Math.PI);
-      ctx.lineTo(x + m.width, y - 3);
-      ctx.arc(x + m.width, y, 3, -0.5 * Math.PI, 0.5 * Math.PI);
-      ctx.lineTo(x, y + 3);
+      // ctx.arc(x, y, 3, 0.5 * Math.PI, -0.5 * Math.PI);
+      // ctx.lineTo(x + width, y - 3);
+      // ctx.arc(x + width, y, 3, -0.5 * Math.PI, 0.5 * Math.PI);
+      // ctx.lineTo(x, y + 3);
+      ctx.lineTo(x - 1, y - 1);
+      ctx.lineTo(x + width + 1, y - 1);
+      ctx.lineTo(x + width + 1, y + 8);
+      ctx.lineTo(x - 1, y + 8);
+      ctx.closePath();
       ctx.fill();
       ctx.stroke();
 
       ctx.fillStyle = "black";
-      ctx.fillText(
-        hoverNode.node.labels.toString(),
-        hoverNode.x! + 5,
-        hoverNode.y! + 5
-      );
+      ctx.fillText(name, x, y);
+      ctx.fillText(type, x, y + 4);
       ctx.restore();
     }
   };

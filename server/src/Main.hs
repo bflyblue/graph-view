@@ -69,12 +69,10 @@ data Env = Env
 
 type App =
   "api" :> Api
-    :<|> "node" :> Capture "node_id" Int :> Get '[HTML] (Document (InOut Node))
-    :<|> "nodelabel" :> Capture "label" Text :> Get '[HTML] (Document (InOut [Node]))
     :<|> Raw
 
 type Api =
-  "graph" :> Get '[JSON] [Node]
+  "graph" :> Get '[JSON] [WithTags Node]
     :<|> "node" :> Capture "node_id" Int :> Get '[JSON] Node
     :<|> "edge" :> Capture "edge_id" Int :> Get '[JSON] Edge
 
@@ -93,6 +91,8 @@ data Edge = Edge
   , edgeA :: Int
   , edgeB :: Int
   }
+
+data WithTags a = WithTags [(Text, Text)] a
 
 instance ToJSON Node where
   toJSON node =
@@ -114,6 +114,17 @@ instance ToJSON Edge where
       , "b" .= edgeB edge
       ]
 
+instance ToJSON (WithTags Node) where
+  toJSON (WithTags tags node) =
+    object
+      [ "node_id" .= nodeId node
+      , "labels" .= nodeLabels node
+      , "properties" .= nodeProperties node
+      , "in" .= nodeIn node
+      , "out" .= nodeOut node
+      , "tags" .= tags
+      ]
+
 id' :: Monad m => ToHtml a => a -> HtmlT m ()
 id' a = div_ [class_ "id"] (toHtml a)
 
@@ -123,11 +134,13 @@ labels a = div_ [class_ "labels"] (toHtml a)
 label :: Monad m => ToHtml a => a -> HtmlT m ()
 label a = div_ [class_ "label"] (toHtml a)
 
+{-
 nodeLink :: Monad m => Int -> Text -> HtmlT m ()
 nodeLink nodeId txt = a_ [safeAbsHref_ (Proxy :: Proxy App) (Proxy :: Proxy ("node" :> Capture "node_id" Int :> Get '[HTML] (Document (InOut Node)))) nodeId] (toHtml txt)
 
 nodeLabelLink :: Monad m => Text -> Text -> HtmlT m ()
 nodeLabelLink lbl txt = a_ [safeAbsHref_ (Proxy :: Proxy App) (Proxy :: Proxy ("nodelabel" :> Capture "label" Text :> Get '[HTML] (Document (InOut [Node])))) lbl] (toHtml txt)
+-}
 
 newtype Properties = Properties Value
 
@@ -149,6 +162,7 @@ property key val = do
   div_ [class_ "key"] (toHtml $ Key.toText key)
   div_ [class_ "val"] (toHtml val)
 
+{-
 instance ToHtml Node where
   toHtml node = do
     div_ [class_ "edges in"] $ do
@@ -193,13 +207,11 @@ newtype InOut a = InOut a
 instance ToHtml a => ToHtml (InOut a) where
   toHtml (InOut a) = div_ [class_ "in-node-out"] $ toHtml a
   toHtmlRaw = toHtml
+-}
 
 app :: Env -> Server App
 app env =
-  api env
-    :<|> fmap (Document . InOut) . getNode env
-    :<|> fmap (Document . InOut) . getNodesLabelled env
-    :<|> serveDirectoryFileServer (webroot $ envOptions env)
+  api env :<|> serveDirectoryFileServer (webroot $ envOptions env)
 
 api :: Env -> Server Api
 api env = getGraph env :<|> getNode env :<|> getEdge env
@@ -209,13 +221,14 @@ single [] = throwError err404
 single [x] = return x
 single _ = throwError err500
 
-getGraph :: Env -> Handler [Node]
+getGraph :: Env -> Handler [WithTags Node]
 getGraph env = withResource (envDbPool env) $ \conn -> do
   nodes <- liftIO (query_ conn "select id, labels, properties from nodes")
   forM nodes $ \node@(nodeId, _, _) -> do
     ins <- liftIO (query conn "select id, labels, properties, a, b from edges where b=?" (Only nodeId))
     outs <- liftIO (query conn "select id, labels, properties, a, b from edges where a=?" (Only nodeId))
-    return (mkNode node ins outs)
+    tags <- liftIO (query conn "select key, value from tags where id=?" (Only nodeId))
+    return (WithTags tags (mkNode node ins outs))
  where
   mkNode (nid, lbls, props) i o = Node nid (fromPGArray lbls) props (map mkEdge i) (map mkEdge o)
   mkEdge (eid, lbls, props, a, b) = Edge eid (fromPGArray lbls) props a b
