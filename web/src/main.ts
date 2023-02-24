@@ -68,9 +68,19 @@ const graph = (nodes: Node[], edges: Edge[]) => {
     ctx.textBaseline = "middle";
     nodes.forEach((d, _i) => {
       if (d === selectedNode) {
-        ctx.fillStyle = "red";
+        ctx.fillStyle = "black";
       } else {
-        ctx.fillStyle = "green";
+        if (selectedNode === undefined) {
+          ctx.fillStyle = "green";
+        } else {
+          if (d.node.in.some((e) => e.a === selectedNode?.id)) {
+            ctx.fillStyle = "blue";
+          } else if (d.node.out.some((e) => e.b === selectedNode?.id)) {
+            ctx.fillStyle = "red";
+          } else {
+            ctx.fillStyle = "grey";
+          }
+        }
       }
       ctx.beginPath();
       ctx.arc(d.x!, d.y!, 5, 0, 2 * Math.PI);
@@ -84,6 +94,39 @@ const graph = (nodes: Node[], edges: Edge[]) => {
     ctx.restore();
   };
 
+  const drawHover = () => {
+    if (hoverNode && hoverNode.x !== undefined && hoverNode.y !== undefined) {
+      ctx.save();
+      ctx.font = '3px "Roboto Condensed", serif';
+      ctx.textAlign = "start";
+      ctx.textBaseline = "middle";
+
+      const text = hoverNode.node.labels.toString();
+      const m = ctx.measureText(text);
+      const x = hoverNode.x + 5;
+      const y = hoverNode.y + 5;
+
+      ctx.fillStyle = "white";
+      ctx.strokeStyle = "black";
+
+      ctx.beginPath();
+      ctx.arc(x, y, 3, 0.5 * Math.PI, -0.5 * Math.PI);
+      ctx.lineTo(x + m.width, y - 3);
+      ctx.arc(x + m.width, y, 3, -0.5 * Math.PI, 0.5 * Math.PI);
+      ctx.lineTo(x, y + 3);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = "black";
+      ctx.fillText(
+        hoverNode.node.labels.toString(),
+        hoverNode.x! + 5,
+        hoverNode.y! + 5
+      );
+      ctx.restore();
+    }
+  };
+
   const draw = () => {
     const { width, height } = canvas.node()!;
     ctx.resetTransform();
@@ -93,6 +136,7 @@ const graph = (nodes: Node[], edges: Edge[]) => {
     ctx.translate(width / 2, height / 2);
     drawLinks();
     drawNodes();
+    drawHover();
     window.requestAnimationFrame(draw);
   };
 
@@ -105,7 +149,10 @@ const graph = (nodes: Node[], edges: Edge[]) => {
     )
     .force("charge", d3.forceManyBody())
     .force("x", d3.forceX())
-    .force("y", d3.forceY());
+    .force("y", d3.forceY())
+    .on("tick", () => {
+      findHover();
+    });
 
   const zoom = d3
     .zoom<HTMLCanvasElement, undefined>()
@@ -140,6 +187,17 @@ const graph = (nodes: Node[], edges: Edge[]) => {
         .html((l) => l);
       const p = n.append("div").classed("properties", true);
       appendProps(p, node.node.properties);
+    }
+  };
+
+  var hoverNode: Node | undefined = undefined;
+  var hoverPos: { x: number; y: number } | undefined = undefined;
+
+  const findHover = async () => {
+    if (hoverPos) {
+      hoverNode = simulation.find(hoverPos.x, hoverPos.y, 5);
+    } else {
+      hoverNode = undefined;
     }
   };
 
@@ -181,6 +239,16 @@ const graph = (nodes: Node[], edges: Edge[]) => {
       const clicked = simulation.find(l[0]!, l[1]!, 5);
       await selectNode(clicked);
     }
+  });
+
+  canvas.on("mousemove", async (event) => {
+    const { width, height } = canvas.node()!;
+    const p = d3.pointer(event, canvas.node());
+    hoverPos = {
+      x: (p[0] - tx) / s - width / 2,
+      y: (p[1] - ty) / s - height / 2,
+    };
+    findHover();
   });
 
   canvas.call(zoom);
