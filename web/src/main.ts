@@ -3,6 +3,8 @@ import * as d3 from "d3";
 type Node = d3.SimulationNodeDatum & {
   id: number;
   node: ApiNode;
+  weight: number;
+  size: number;
 };
 
 type Edge = d3.SimulationLinkDatum<Node> & {
@@ -99,7 +101,7 @@ const graph = (nodes: Node[], edges: Edge[]) => {
         }
       }
       ctx.beginPath();
-      ctx.arc(d.x!, d.y!, 5, 0, 2 * Math.PI);
+      ctx.arc(d.x!, d.y!, d.size, 0, 2 * Math.PI);
       ctx.fill();
       ctx.stroke();
       if (s > 2) {
@@ -112,8 +114,10 @@ const graph = (nodes: Node[], edges: Edge[]) => {
 
   const drawHover = () => {
     if (hoverNode && hoverNode.x !== undefined && hoverNode.y !== undefined) {
+      const pad = 2;
+
       ctx.save();
-      ctx.font = '3px "Roboto Condensed", serif';
+      ctx.font = '16px "Roboto Condensed", serif';
       ctx.textAlign = "start";
       ctx.textBaseline = "top";
 
@@ -123,29 +127,27 @@ const graph = (nodes: Node[], edges: Edge[]) => {
         ctx.measureText(name).width,
         ctx.measureText(type).width
       );
-      const x = hoverNode.x + 5;
-      const y = hoverNode.y + 5;
+
+      ctx.translate(hoverNode.x, hoverNode.y);
+      ctx.translate(5, -5);
+      ctx.scale(1 / s, 1 / s);
 
       ctx.fillStyle = "white";
       ctx.strokeStyle = "black";
 
-      ctx.lineWidth = 0.2 / s;
+      ctx.lineWidth = 0.5;
       ctx.beginPath();
-      // ctx.arc(x, y, 3, 0.5 * Math.PI, -0.5 * Math.PI);
-      // ctx.lineTo(x + width, y - 3);
-      // ctx.arc(x + width, y, 3, -0.5 * Math.PI, 0.5 * Math.PI);
-      // ctx.lineTo(x, y + 3);
-      ctx.lineTo(x - 1, y - 1);
-      ctx.lineTo(x + width + 1, y - 1);
-      ctx.lineTo(x + width + 1, y + 8);
-      ctx.lineTo(x - 1, y + 8);
+      ctx.lineTo(-pad, -pad - 32);
+      ctx.lineTo(width + pad, -pad - 32);
+      ctx.lineTo(width + pad, pad);
+      ctx.lineTo(-pad, pad);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
 
       ctx.fillStyle = "black";
-      ctx.fillText(name, x, y);
-      ctx.fillText(type, x, y + 4);
+      ctx.fillText(name, 0, -32);
+      ctx.fillText(type, 0, -14);
       ctx.restore();
     }
   };
@@ -165,12 +167,15 @@ const graph = (nodes: Node[], edges: Edge[]) => {
 
   const simulation = d3
     .forceSimulation(nodes)
-    .alphaDecay(0.005)
+    .alphaDecay(0.01)
     .force(
       "link",
       d3.forceLink(edges).id((d) => (d as Node).id)
     )
-    .force("charge", d3.forceManyBody())
+    .force(
+      "charge",
+      d3.forceManyBody().strength((n) => (n as Node).weight * -5 - 20)
+    )
     .force("x", d3.forceX())
     .force("y", d3.forceY())
     .on("tick", () => {
@@ -216,9 +221,29 @@ const graph = (nodes: Node[], edges: Edge[]) => {
   var hoverNode: Node | undefined = undefined;
   var hoverPos: { x: number; y: number } | undefined = undefined;
 
+  const distance = (
+    a: { x: number; y: number },
+    b: { x: number; y: number }
+  ): number => {
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
   const findHover = async () => {
     if (hoverPos) {
-      hoverNode = simulation.find(hoverPos.x, hoverPos.y, 5);
+      var searchRadius = 100;
+      hoverNode = undefined;
+      do {
+        if (hoverNode !== undefined) {
+          searchRadius = hoverNode.size * 0.99;
+        }
+        hoverNode = simulation.find(hoverPos.x, hoverPos.y, searchRadius);
+      } while (
+        hoverNode !== undefined &&
+        distance(hoverPos, hoverNode as { x: number; y: number }) >
+          hoverNode.size
+      );
     } else {
       hoverNode = undefined;
     }
@@ -281,13 +306,26 @@ const graph = (nodes: Node[], edges: Edge[]) => {
   return canvas.node();
 };
 
+const node_weight = (n: ApiNode): number => {
+  return n.in.length + n.out.length;
+};
+
+const node_size = (n: ApiNode): number => {
+  return 5 + 0.05 * node_weight(n);
+};
+
 const main = async () => {
   const data: ApiGraph | undefined = await d3.json(
     "http://neptune:8080/api/graph"
   );
   if (data) {
     const div = d3.select("#graph");
-    const nodes: Node[] = data.map((n) => ({ id: n.node_id, node: n }));
+    const nodes: Node[] = data.map((n) => ({
+      id: n.node_id,
+      node: n,
+      weight: node_weight(n),
+      size: node_size(n),
+    }));
     const edges: Edge[] = data.flatMap((n) =>
       d3.map(n.in, (e) => ({ source: e.a, target: e.b, edge: e }))
     );
