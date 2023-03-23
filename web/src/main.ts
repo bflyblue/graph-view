@@ -230,22 +230,24 @@ const graph = (nodes: Node[], edges: Edge[]) => {
     return Math.sqrt(dx * dx + dy * dy);
   };
 
+  const intersectsNode = (
+    p: { x: number; y: number },
+    sr: number | undefined
+  ): Node | undefined => {
+    const over = simulation.find(p.x, p.y, sr);
+    if (over) {
+      if (distance(p, over as { x: number; y: number }) <= over.size) {
+        return over;
+      } else {
+        return intersectsNode(p, over.size * 0.99);
+      }
+    }
+    return undefined;
+  };
+
   const findHover = async () => {
     if (hoverPos) {
-      var searchRadius = 100;
-      hoverNode = undefined;
-      do {
-        if (hoverNode !== undefined) {
-          searchRadius = hoverNode.size * 0.99;
-        }
-        hoverNode = simulation.find(hoverPos.x, hoverPos.y, searchRadius);
-      } while (
-        hoverNode !== undefined &&
-        distance(hoverPos, hoverNode as { x: number; y: number }) >
-          hoverNode.size
-      );
-    } else {
-      hoverNode = undefined;
+      hoverNode = intersectsNode(hoverPos, 100);
     }
   };
 
@@ -283,8 +285,11 @@ const graph = (nodes: Node[], edges: Edge[]) => {
     if (event.detail === 1) {
       const { width, height } = canvas.node()!;
       const p = d3.pointer(event, canvas.node());
-      const l = [(p[0] - tx) / s - width / 2, (p[1] - ty) / s - height / 2];
-      const clicked = simulation.find(l[0]!, l[1]!, 5);
+      const clickPos = {
+        x: (p[0] - tx) / s - width / 2,
+        y: (p[1] - ty) / s - height / 2,
+      };
+      const clicked = intersectsNode(clickPos, 100);
       await selectNode(clicked);
     }
   });
