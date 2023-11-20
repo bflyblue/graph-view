@@ -321,7 +321,7 @@ const node_size = (n: ApiNode): number => {
 
 const main = async () => {
   const data: ApiGraph | undefined = await d3.json(
-    "http://neptune:8080/api/graph"
+    "http://localhost:8080/api/graph"
   );
   if (data) {
     const div = d3.select("#graph");
